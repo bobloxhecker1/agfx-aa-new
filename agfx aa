@@ -1,0 +1,316 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local Workspace = game:GetService("Workspace")
+
+-- Player
+local localPlayer = Players.LocalPlayer
+local PlayerGui = localPlayer:WaitForChild("PlayerGui")
+local camera = Workspace.CurrentCamera
+local mouse = localPlayer:GetMouse()
+
+-- Meta ESP Activation
+UserInputService.InputBegan:Connect(function(input, gp)
+    if not gp and input.KeyCode == Enum.KeyCode.Equals then
+        local success, result = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/VapeVoidware/VWExtra/main/metalesp.lua", true))()
+        end)
+        if success then
+            print("[Meta ESP] Loaded successfully.")
+        else
+            warn("[Meta ESP] Failed to load: " .. result)
+        end
+    end
+end)
+
+-- AGFX Splash Sound
+local sound = Instance.new("Sound")
+sound.SoundId = "rbxassetid://6365992529"
+sound.Volume = 1
+sound.Parent = SoundService
+
+-- Blur effect
+local blur = Instance.new("BlurEffect")
+blur.Size = 0
+blur.Parent = Lighting
+
+-- Splash GUI
+local flashGui = Instance.new("ScreenGui", PlayerGui)
+flashGui.IgnoreGuiInset = true
+flashGui.ResetOnSpawn = false
+flashGui.Name = "AGFXFlashOverlay"
+
+local flashFrame = Instance.new("Frame", flashGui)
+flashFrame.BackgroundTransparency = 1
+flashFrame.Size = UDim2.new(1, 0, 1, 0)
+
+local gradient = Instance.new("UIGradient", flashFrame)
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(128, 0, 255))
+}
+gradient.Rotation = 45
+
+local textHolder = Instance.new("Frame", flashFrame)
+textHolder.BackgroundTransparency = 1
+textHolder.AnchorPoint = Vector2.new(0.5, 0.5)
+textHolder.Position = UDim2.new(0.5, 0, 0.5, 0)
+textHolder.Size = UDim2.new(0.5, 0, 0.5, 0)
+
+local mainText = Instance.new("TextLabel", textHolder)
+mainText.Size = UDim2.new(1, 0, 0.5, 0)
+mainText.Text = "AGFX"
+mainText.TextColor3 = Color3.new(1, 1, 1)
+mainText.TextTransparency = 1
+mainText.BackgroundTransparency = 1
+mainText.Font = Enum.Font.GothamBlack
+mainText.TextScaled = true
+
+local loadingText = Instance.new("TextLabel", textHolder)
+loadingText.Size = UDim2.new(1, 0, 0.2, 0)
+loadingText.Position = UDim2.new(0, 0, 1, 0)
+loadingText.Text = "loading .."
+loadingText.TextColor3 = Color3.new(1, 1, 1)
+loadingText.TextTransparency = 1
+loadingText.BackgroundTransparency = 1
+loadingText.Font = Enum.Font.Gotham
+loadingText.TextScaled = true
+
+local function createTextLabel()
+    local screenGui = Instance.new("ScreenGui", PlayerGui)
+    screenGui.Name = "AgfxLabelGUI"
+    screenGui.ResetOnSpawn = false
+
+    local textLabel = Instance.new("TextLabel", screenGui)
+    textLabel.Size = UDim2.new(0, 200, 0, 50)
+    textLabel.Position = UDim2.new(1, -210, 0, 10)
+    textLabel.Text = "agfx"
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextTransparency = 1
+    textLabel.Font = Enum.Font.ArialBold
+    textLabel.BackgroundTransparency = 1
+    textLabel.TextScaled = true
+
+    return textLabel
+end
+
+local agfxSideText = createTextLabel()
+local fadeInSideText = TweenService:Create(agfxSideText, TweenInfo.new(3), {TextTransparency = 0})
+local fadeInFrame = TweenService:Create(flashFrame, TweenInfo.new(3), {BackgroundTransparency = 0})
+local fadeInBlur = TweenService:Create(blur, TweenInfo.new(3), {Size = 24})
+local fadeOutFrame = TweenService:Create(flashFrame, TweenInfo.new(5), {BackgroundTransparency = 1})
+local fadeOutBlur = TweenService:Create(blur, TweenInfo.new(5), {Size = 0})
+local fadeInText1 = TweenService:Create(mainText, TweenInfo.new(3), {TextTransparency = 0})
+local fadeInText2 = TweenService:Create(loadingText, TweenInfo.new(3), {TextTransparency = 0})
+local fadeOutText1 = TweenService:Create(mainText, TweenInfo.new(5), {TextTransparency = 1})
+local fadeOutText2 = TweenService:Create(loadingText, TweenInfo.new(5), {TextTransparency = 1})
+
+sound:Play()
+fadeInFrame:Play()
+fadeInBlur:Play()
+fadeInText1:Play()
+fadeInText2:Play()
+fadeInSideText:Play()
+
+fadeInFrame.Completed:Connect(function()
+    task.delay(1, function()
+        fadeOutFrame:Play()
+        fadeOutBlur:Play()
+        fadeOutText1:Play()
+        fadeOutText2:Play()
+        fadeOutFrame.Completed:Connect(function()
+            flashGui:Destroy()
+            blur:Destroy()
+        end)
+    end)
+end)
+
+-- Camlock Logic
+local currentTarget, locked, espEnabled = nil, false, false
+
+local function debugPrint(msg)
+    print("[Camera Lock] " .. msg)
+end
+
+local function applyHighlightToCharacter(character)
+    if not character:FindFirstChild("AgfxHighlight") then
+        local highlight = Instance.new("Highlight", character)
+        highlight.Name = "AgfxHighlight"
+        highlight.FillTransparency = 1
+        highlight.OutlineTransparency = 0
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        highlight.Adornee = character
+    end
+end
+
+local function removeHighlightFromCharacter(character)
+    local h = character:FindFirstChild("AgfxHighlight")
+    if h then h:Destroy() end
+end
+
+local function isTeammate(player)
+    return player.Team == localPlayer.Team
+end
+
+local function getClosestPlayer()
+    local myChar = localPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = myChar.HumanoidRootPart.Position
+    local closest, dist = nil, math.huge
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and not isTeammate(p) then
+            local d = (p.Character.HumanoidRootPart.Position - myPos).Magnitude
+            if d < dist then
+                dist, closest = d, p
+            end
+        end
+    end
+    return closest
+end
+
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+
+    if input.KeyCode == Enum.KeyCode.RightBracket then
+        espEnabled = not espEnabled
+        for _, p in pairs(Players:GetPlayers()) do
+            if p.Character and not isTeammate(p) then
+                if espEnabled then applyHighlightToCharacter(p.Character)
+                else removeHighlightFromCharacter(p.Character) end
+            end
+        end
+        debugPrint("ESP " .. (espEnabled and "enabled" or "disabled"))
+    end
+
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.R then
+        local function lockOn(p)
+            if p and p.Character and p.Character:FindFirstChild("Head") then
+                currentTarget = p.Character.Head
+                locked = true
+                applyHighlightToCharacter(p.Character)
+                debugPrint("Locked onto: " .. p.Name)
+                local h = p.Character:FindFirstChildOfClass("Humanoid")
+                if h then
+                    h.Died:Once(function()
+                        if currentTarget and currentTarget:IsDescendantOf(p.Character) then
+                            removeHighlightFromCharacter(p.Character)
+                            currentTarget, locked = nil, false
+                            debugPrint("Target died.")
+                        end
+                    end)
+                end
+            end
+        end
+
+        if locked then
+            if currentTarget and currentTarget.Parent then removeHighlightFromCharacter(currentTarget.Parent) end
+            currentTarget, locked = nil, false
+            debugPrint("Unlocked.")
+        else
+            if input.KeyCode == Enum.KeyCode.X then
+                lockOn(getClosestPlayer())
+            elseif input.KeyCode == Enum.KeyCode.R then
+                local target = mouse.Target
+                local model = target and target:FindFirstAncestorOfClass("Model")
+                local playerFromModel = model and Players:GetPlayerFromCharacter(model)
+                if playerFromModel and not isTeammate(playerFromModel) then lockOn(playerFromModel) end
+            end
+        end
+    end
+
+    if input.KeyCode == Enum.KeyCode.Minus then
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if locked and currentTarget then
+        local pos = currentTarget.Position
+        local camPos = camera.CFrame.Position
+        camera.CFrame = CFrame.new(camPos, camPos + (pos - camPos).Unit)
+    end
+end)
+
+-- Air Countdown Logic
+local airGui = Instance.new("ScreenGui", PlayerGui)
+airGui.Name = "AirCountdownGui"
+airGui.ResetOnSpawn = false
+
+local countdownLabel = Instance.new("TextLabel", airGui)
+countdownLabel.Size = UDim2.new(0, 200, 0, 50)
+countdownLabel.Position = UDim2.new(0.5, -100, 0.3, 0)
+countdownLabel.BackgroundTransparency = 0.3
+countdownLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+countdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+countdownLabel.TextScaled = true
+countdownLabel.Visible = false
+countdownLabel.Font = Enum.Font.GothamBold
+countdownLabel.Text = "1.2"
+
+local isCounting = false
+local airStates = {
+    [Enum.HumanoidStateType.Freefall] = true,
+    [Enum.HumanoidStateType.Jumping] = true,
+    [Enum.HumanoidStateType.FallingDown] = true,
+}
+
+local function startCountdown()
+    if isCounting then return end
+    isCounting = true
+    countdownLabel.Visible = true
+
+    local timeLeft = 1.2
+    while timeLeft > 0 and isCounting do
+        countdownLabel.Text = string.format("%.1f", timeLeft)
+        RunService.RenderStepped:Wait()
+        timeLeft -= RunService.RenderStepped:Wait()
+    end
+
+    countdownLabel.Visible = false
+    isCounting = false
+end
+
+local function connectStateMonitor(humanoid)
+    humanoid.StateChanged:Connect(function(_, newState)
+        if airStates[newState] then
+            startCountdown()
+        else
+            isCounting = false
+            countdownLabel.Visible = false
+        end
+    end)
+end
+
+local function onCharacterAdded(char)
+    local humanoid = char:WaitForChild("Humanoid")
+    connectStateMonitor(humanoid)
+end
+
+if localPlayer.Character then
+    onCharacterAdded(localPlayer.Character)
+end
+localPlayer.CharacterAdded:Connect(onCharacterAdded)
+
+-- Function to check if players need ESP and apply it
+local function updateESP()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p.Character and not isTeammate(p) then
+            if espEnabled and not p.Character:FindFirstChild("AgfxHighlight") then
+                applyHighlightToCharacter(p.Character)
+            elseif not espEnabled and p.Character:FindFirstChild("AgfxHighlight") then
+                removeHighlightFromCharacter(p.Character)
+            end
+        end
+    end
+end
+
+-- Periodically check every 2 seconds to ensure ESP is applied to all necessary players
+while true do
+    updateESP()
+    wait(0.1) -- Wait for 2 seconds before checking again
+end
