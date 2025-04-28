@@ -1,3 +1,114 @@
+--// Services
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+
+--// Speed Variables
+local speedLockEnabled = false
+local desiredSpeed = 23
+local offSpeed = 15
+
+--// GUI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Parent = game.CoreGui
+
+local speedButton = Instance.new("TextButton")
+speedButton.Size = UDim2.new(0, 200, 0, 50)
+speedButton.Position = UDim2.new(0.5, -100, 0.5, -25)
+speedButton.Text = "Enable Speed Lock"
+speedButton.Visible = false
+speedButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+speedButton.TextColor3 = Color3.new(1,1,1)
+speedButton.Font = Enum.Font.GothamBold
+speedButton.TextSize = 20
+speedButton.Parent = screenGui
+speedButton.BorderSizePixel = 0
+speedButton.BackgroundTransparency = 0.1
+speedButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+
+--// Notification Function
+local function notify(message)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "Speed Lock",
+            Text = message,
+            Duration = 2
+        })
+    end)
+end
+
+--// Enforce Speed
+RunService.Heartbeat:Connect(function()
+    if speedLockEnabled and humanoid then
+        if humanoid.WalkSpeed ~= desiredSpeed then
+            humanoid.WalkSpeed = desiredSpeed
+        end
+    end
+end)
+
+--// Character Respawn Fix
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoid = character:WaitForChild("Humanoid")
+end)
+
+--// Button Click
+speedButton.MouseButton1Click:Connect(function()
+    speedLockEnabled = not speedLockEnabled
+    if speedLockEnabled then
+        humanoid.WalkSpeed = desiredSpeed
+        speedButton.Text = "Disable Speed Lock"
+        notify("Speed Lock: ON")
+    else
+        humanoid.WalkSpeed = offSpeed
+        speedButton.Text = "Enable Speed Lock"
+        notify("Speed Lock: OFF")
+    end
+end)
+
+--// RightShift Key Toggle GUI
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        speedButton.Visible = not speedButton.Visible
+        if speedButton.Visible then
+            -- Fade in animation
+            speedButton:TweenPosition(UDim2.new(0.5, -100, 0.5, -25), "Out", "Quad", 0.5, true)
+        else
+            -- Fade out animation
+            speedButton:TweenPosition(UDim2.new(0.5, -100, 0.5, -25), "In", "Quad", 0.5, true)
+        end
+    end
+end)
+
+--// Draggable Button
+local dragging = false
+local dragInput, dragStart, startPos
+
+speedButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = speedButton.Position
+    end
+end)
+
+speedButton.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        speedButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+speedButton.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
